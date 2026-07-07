@@ -1,0 +1,25 @@
+
+document.addEventListener("DOMContentLoaded",function(){
+
+const stat=document.getElementById("stat-card-container");
+const topBtn=document.getElementById("toggleTopPanel");
+const bottom=document.getElementById("dashboard-bottom");
+const bottomBtn=document.getElementById("toggleBottomPanel");
+
+if(topBtn){
+ topBtn.onclick=function(e){
+   e.preventDefault();
+   stat.classList.toggle("stat-hidden");
+   topBtn.innerHTML=stat.classList.contains("stat-hidden")?"▼":"▲";
+ };
+}
+
+if(bottomBtn){
+ bottomBtn.onclick=function(e){
+   e.preventDefault();
+   bottom.classList.toggle("bottom-hidden");
+   bottomBtn.innerHTML=bottom.classList.contains("bottom-hidden")?"▲":"▼";
+ };
+}
+
+});

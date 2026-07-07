@@ -1,0 +1,1344 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/L.Control.Locate.min.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+<link rel="stylesheet" href="css/dashboard.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet-search.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        </style>
+        <title>PETA SEBARAN BANTUAN PERUMAHAN KABUPATEN SIMALUNGUN</title>
+    </head>
+    
+<body>
+<div id="dashboard">
+
+<div id="header-dashboard">
+    <img src="images/logo_simalungun.png" alt="Logo Kabupaten Simalungun" class="header-logo-simalungun">
+    <div class="header-title-wrap">
+        <h1>WEBGIS SEBARAN BANTUAN PERUMAHAN</h1>
+        <p>KABUPATEN SIMALUNGUN TAHUN 2023 - 2026</p>
+    </div>
+</div>
+
+<button id="toggleTopPanel" class="panel-toggle top-toggle">▲</button>
+<div id="stat-card-container">
+    <div class="stat-card"><span>Desa Penerima</span><b id="desaPenerimaTotal">-</b><small id="desaPersen"></small></div>
+    <div class="stat-card"><span>Kecamatan Penerima</span><b id="kecamatanPenerimaTotal">-</b><small id="kecamatanPersen"></small></div>
+    <div class="stat-card"><span>Total Bantuan</span><b id="totalBantuan">-</b></div>
+    <div class="stat-card"><span>1 Kali Bantuan</span><b id="sekaliBantuan">-</b></div>
+    <div class="stat-card"><span>>1 Kali Bantuan</span><b id="multiBantuan">-</b></div>
+</div>
+
+<button id="toggleFilterPanel" class="filter-toggle-mobile" type="button" aria-label="Buka filter data">☰ Filter Data</button>
+
+<div id="filter-dashboard">
+    <select id="filterTahun">
+        <option value="all">Semua Tahun</option>
+        <option value="2023">2023</option>
+        <option value="2024">2024</option>
+        <option value="2025">2025</option>
+        <option value="2026">2026</option>
+    </select>
+
+    <select id="filterJenis">
+        <option value="all">Semua Jenis Bantuan</option>
+        <option value="BSPS">BSPS</option>
+        <option value="APBD Provinsi">APBD Provinsi</option>
+        <option value="APBD Kabupaten">APBD Kabupaten</option>
+    </select>
+
+    <button onclick="resetDashboard()">Reset Filter</button>
+</div>
+
+<button id="fullscreenBtn" class="fullscreen-map-button" type="button" title="Tampilkan fullscreen" aria-label="Tampilkan fullscreen">⛶</button>
+
+<div id="map"></div>
+
+<button id="toggleBottomPanel" class="panel-toggle bottom-toggle">▼</button>
+<div id="dashboard-bottom">
+
+<div class="chart-box">
+<h3>Bantuan Per Kecamatan</h3>
+<canvas id="chartKecamatan"></canvas>
+</div>
+
+<div class="chart-box">
+<h3>Jenis Bantuan</h3>
+<canvas id="chartJenis"></canvas>
+</div>
+
+<div class="chart-box">
+<h3>Perkembangan Tahun</h3>
+<canvas id="chartTahun"></canvas>
+</div>
+
+<div class="info-box">
+<h3 id="infoTitle">Informasi Desa</h3>
+<div id="infoDesa">
+Klik desa pada peta untuk melihat informasi.
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/L.Control.Locate.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="js/leaflet-search.js"></script>
+        <script src="data/Tahun2026_5.js"></script>
+        <script src="data/Tahun2025_6.js"></script>
+        <script src="data/Tahun2024_7.js"></script>
+        <script src="data/Tahun2023_8.js"></script>
+        <script src="data/BSPS_9.js"></script>
+        <script src="data/APBDProvinsi_10.js"></script>
+        <script src="data/APBDKabupaten_11.js"></script>
+        <script src="data/InformasiWilayah_12.js"></script>
+        <script src="data/BatasKecamatan_13.js"></script>
+        <script>
+        var highlightLayer;
+        function highlightFeature(e) {
+            highlightLayer = e.target;
+
+            if (e.target.feature.geometry.type === 'LineString' || e.target.feature.geometry.type === 'MultiLineString') {
+              highlightLayer.setStyle({
+                color: 'rgba(46, 92, 138, 1.00)',
+              });
+            } else {
+              highlightLayer.setStyle({
+                fillColor: 'rgba(46, 92, 138, 1.00)',
+                fillOpacity: 1
+              });
+            }
+        }
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        }).fitBounds([[2.597795182850769,98.4551009601833],[3.3086515020784493,99.57199840895385]]);
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/qgis2web/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                    // Aggiorna il popup quando il video carica i metadati
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var title = new L.Control({'position':'topleft'});
+        title.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+        title.update = function () {
+            this._div.innerHTML = '';
+        };
+        title.addTo(map);
+        var abstract = new L.Control({'position':'bottomright'});
+        abstract.onAdd = function (map) {
+            this._div = L.DomUtil.create('div',
+            'leaflet-control abstract');
+            this._div.id = 'abstract'
+                this._div.setAttribute("onmouseenter", "abstract.show()");
+                this._div.setAttribute("onmouseleave", "abstract.hide()");
+                this.hide();
+                return this._div;
+            };
+            abstract.hide = function () {
+                this._div.classList.remove("abstractUncollapsed");
+                this._div.classList.add("abstract");
+                this._div.innerHTML = 'i'
+            }
+            abstract.show = function () {
+                this._div.classList.remove("abstract");
+                this._div.classList.add("abstractUncollapsed");
+                this._div.innerHTML = 'Peta Sebaran Bantuan Perumahan Kabupaten Simalungun merupakan WebGIS yang menyajikan informasi spasial mengenai distribusi bantuan perumahan berdasarkan desa/kelurahan di Kabupaten Simalungun. Data yang ditampilkan meliputi bantuan yang bersumber dari APBD Kabupaten, APBD Provinsi, dan BSPS, serta dapat difilter berdasarkan tahun pelaksanaan. WebGIS ini bertujuan mendukung penyajian informasi, monitoring, evaluasi, dan pengambilan keputusan dalam pelaksanaan program bantuan perumahan.';
+        };
+        abstract.addTo(map);
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        L.control.locate({locateOptions: {maxZoom: 19}}).addTo(map);
+        var measureControl = new L.Control.Measure({
+            position: 'topleft',
+            primaryLengthUnit: 'meters',
+            secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters',
+            secondaryAreaUnit: 'hectares'
+        });
+        measureControl.addTo(map);
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].innerHTML = '';
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].className += ' fas fa-ruler';
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        map.createPane('pane_GoogleRoad_0');
+        map.getPane('pane_GoogleRoad_0').style.zIndex = 400;
+        var layer_GoogleRoad_0 = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleRoad_0',
+            opacity: 1.0,
+            attribution: '<a href="https://www.google.at/permissions/geoguidelines/attr-guide.html">Map data ©2015 Google</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_GoogleRoad_0;
+        map.createPane('pane_GoogleSatellite_1');
+        map.getPane('pane_GoogleSatellite_1').style.zIndex = 401;
+        var layer_GoogleSatellite_1 = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleSatellite_1',
+            opacity: 1.0,
+            attribution: '<a href="https://www.google.at/permissions/geoguidelines/attr-guide.html">Map data ©2015 Google</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_GoogleSatellite_1;
+        map.createPane('pane_OSMStandard_2');
+        map.getPane('pane_OSMStandard_2').style.zIndex = 402;
+        var layer_OSMStandard_2 = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            pane: 'pane_OSMStandard_2',
+            opacity: 1.0,
+            attribution: '<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors, CC-BY-SA</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 19
+        });
+        layer_OSMStandard_2;
+        map.createPane('pane_ESRITopo_3');
+        map.getPane('pane_ESRITopo_3').style.zIndex = 403;
+        var layer_ESRITopo_3 = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            pane: 'pane_ESRITopo_3',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_ESRITopo_3;
+        map.createPane('pane_ESRISatellite_4');
+        map.getPane('pane_ESRISatellite_4').style.zIndex = 404;
+        var layer_ESRISatellite_4 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            pane: 'pane_ESRISatellite_4',
+            opacity: 0.9,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_ESRISatellite_4;
+        map.addLayer(layer_ESRISatellite_4);
+
+        function showInfoDesa(p) {
+            var box = document.getElementById('infoDesa');
+            var title = document.getElementById('infoTitle');
+            if (!box) return;
+
+            function getElVal(id, fallback) {
+                var el = document.getElementById(id);
+                return el ? el.value : fallback;
+            }
+            function clean(v) {
+                if (v === null || typeof v === 'undefined' || v === '') return '-';
+                return String(v).trim();
+            }
+            function normJenis(v) {
+                return clean(v)
+                    .replace(/BPSP/ig, 'BSPS')
+                    .replace(/APBD\s*Kabupaten/ig, 'APBD Kab')
+                    .replace(/APBD\s*Provinsi/ig, 'APBD Prov')
+                    .replace(/^APBD Kab$/i, 'APBD Kabupaten')
+                    .replace(/^APBD Prov$/i, 'APBD Provinsi');
+            }
+            function split(v) {
+                return clean(v).split(',').map(function(x){ return x.trim(); }).filter(function(x){ return x && x !== '-'; });
+            }
+            function row(label, value) {
+                return '<div class="info-row"><span>' + label + '</span><strong>' + clean(value) + '</strong></div>';
+            }
+            function getPropByContains(obj, keyword) {
+                keyword = keyword.toLowerCase();
+                for (var k in obj) {
+                    if (Object.prototype.hasOwnProperty.call(obj, k) && k.toLowerCase().indexOf(keyword) !== -1) {
+                        return obj[k];
+                    }
+                }
+                return null;
+            }
+            function getCurrentFilters() {
+                return {
+                    tahun: getElVal('filterTahun', 'all'),
+                    jenis: normJenis(getElVal('filterJenis', 'all'))
+                };
+            }
+            function findRawRow(desa, kec) {
+                try {
+                    if (typeof dataDashboardAsli === 'undefined' || !dataDashboardAsli.rawDesa) return null;
+                    desa = clean(desa).toLowerCase();
+                    kec = clean(kec).toLowerCase();
+                    return dataDashboardAsli.rawDesa.find(function(r){
+                        return clean(r.Desa_Kelurahan).toLowerCase() === desa && clean(r.Kecamatan).toLowerCase() === kec;
+                    }) || null;
+                } catch (e) {
+                    return null;
+                }
+            }
+            function resolveInfo(prop) {
+                var filters = getCurrentFilters();
+                var desa = prop.Desa_Kelurahan || '-';
+                var kec = prop.Kecamatan || '-';
+                var raw = findRawRow(desa, kec) || {};
+
+                var tahun = raw.Tahun_bantuan || prop.Tahun_bantuan || prop.Tahun_Menerima || getPropByContains(prop, 'jenis_bantuan') || '-';
+                var jenis = raw.Jenis_Bantuan || prop.Jenis_Bantuan || prop['Tahun_2026 — Sheet1_Jenis_Bantuan'] || prop['Tahun_2025 — Sheet1_Jenis_Bantuan'] || prop['Tahun_2024 — Sheet1_Jenis_Bantuan'] || prop['Tahun_2023 — Sheet1_Jenis_Bantuan'] || '-';
+                var jumlah = raw.Jumlah_Bantuan;
+
+                if (filters.tahun !== 'all') tahun = filters.tahun;
+                if (filters.jenis !== 'all') jenis = filters.jenis;
+
+                var menerima = false;
+                split(tahun).forEach(function(y){ if (/^20\d{2}$/.test(y)) menerima = true; });
+                if (normJenis(jenis) !== '-' && normJenis(jenis).toLowerCase() !== 'belum pernah' && normJenis(jenis).toLowerCase() !== 'tidak menerima') menerima = true;
+
+                if (filters.tahun !== 'all' && raw.Tahun_bantuan) {
+                    menerima = split(raw.Tahun_bantuan).indexOf(filters.tahun) !== -1;
+                }
+                if (filters.jenis !== 'all' && raw.Jenis_Bantuan) {
+                    menerima = split(raw.Jenis_Bantuan).map(normJenis).indexOf(filters.jenis) !== -1;
+                }
+                if (filters.tahun !== 'all' && filters.jenis !== 'all' && raw.Tahun_bantuan && raw.Jenis_Bantuan) {
+                    menerima = split(raw.Tahun_bantuan).indexOf(filters.tahun) !== -1 && split(raw.Jenis_Bantuan).map(normJenis).indexOf(filters.jenis) !== -1;
+                }
+
+                var qgisCount = getPropByContains(prop, 'q2whide');
+                qgisCount = Number(qgisCount || 0);
+
+                if (filters.tahun !== 'all' && filters.jenis !== 'all') {
+                    jumlah = menerima ? 1 : 0;
+                } else if (filters.tahun !== 'all') {
+                    jumlah = menerima ? 1 : 0;
+                } else if (filters.jenis !== 'all') {
+                    jumlah = qgisCount > 0 ? qgisCount : (menerima ? Number(raw.Jumlah_Bantuan || 1) : 0);
+                } else if (typeof jumlah === 'undefined' || jumlah === null) {
+                    jumlah = qgisCount;
+                }
+
+                return {
+                    desa: desa,
+                    kec: kec,
+                    tahun: tahun,
+                    jenis: normJenis(jenis),
+                    jumlah: Number(jumlah || 0),
+                    status: menerima ? 'Menerima Bantuan' : 'Tidak Menerima'
+                };
+            }
+
+            var filters = getCurrentFilters();
+            var info = resolveInfo(p || {});
+            var html = '';
+            html += row('Desa/Kelurahan', info.desa);
+            html += row('Kecamatan', info.kec);
+            html += row('Status Bantuan', info.status);
+            if (filters.tahun === 'all') html += row('Tahun Bantuan', info.tahun);
+            if (filters.jenis === 'all') html += row('Jenis Bantuan', info.jenis);
+            html += row('Total Bantuan', info.jumlah + ' Kali');
+
+            box.innerHTML = '<div class="desa-detail">' + html + '</div>';
+            if (title) title.textContent = 'Informasi Desa';
+        }
+
+        function pop_Tahun2026_5(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">Desa_Kelurahan</th>\
+                        <td>' + (feature.properties['Desa_Kelurahan'] !== null ? autolinker.link(String(feature.properties['Desa_Kelurahan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kecamatan</th>\
+                        <td>' + (feature.properties['Kecamatan'] !== null ? autolinker.link(String(feature.properties['Kecamatan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Jenis_bantuan</th>\
+                        <td>' + (feature.properties['Tahun_2026 — Sheet1_Jenis_Bantuan'] !== null ? autolinker.link(String(feature.properties['Tahun_2026 — Sheet1_Jenis_Bantuan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.on('click', function(e) {
+                showInfoDesa(feature.properties);
+            });
+        }
+
+        function style_Tahun2026_5_0(feature) {
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2026'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2026'] <= 0.000000 ) {
+                return {
+                pane: 'pane_Tahun2026_5',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(240,240,240,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2026'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2026'] <= 1.000000 ) {
+                return {
+                pane: 'pane_Tahun2026_5',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(166,118,29,0.85)',
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_Tahun2026_5');
+        map.getPane('pane_Tahun2026_5').style.zIndex = 405;
+        map.getPane('pane_Tahun2026_5').style['mix-blend-mode'] = 'hard-light';
+        var layer_Tahun2026_5 = new L.geoJson(json_Tahun2026_5, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Tahun2026_5',
+            layerName: 'layer_Tahun2026_5',
+            pane: 'pane_Tahun2026_5',
+            onEachFeature: pop_Tahun2026_5,
+            style: style_Tahun2026_5_0,
+        });
+        bounds_group.addLayer(layer_Tahun2026_5);
+        function pop_Tahun2025_6(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">Desa_Kelurahan</th>\
+                        <td>' + (feature.properties['Desa_Kelurahan'] !== null ? autolinker.link(String(feature.properties['Desa_Kelurahan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kecamatan</th>\
+                        <td>' + (feature.properties['Kecamatan'] !== null ? autolinker.link(String(feature.properties['Kecamatan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Jenis Bantuan</th>\
+                        <td>' + (feature.properties['Tahun_2025 — Sheet1_Jenis_Bantuan'] !== null ? autolinker.link(String(feature.properties['Tahun_2025 — Sheet1_Jenis_Bantuan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.on('click', function(e) {
+                showInfoDesa(feature.properties);
+            });
+        }
+
+        function style_Tahun2025_6_0(feature) {
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2025'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2025'] <= 0.000000 ) {
+                return {
+                pane: 'pane_Tahun2025_6',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(240,240,240,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2025'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2025'] <= 1.000000 ) {
+                return {
+                pane: 'pane_Tahun2025_6',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(92,107,192,0.85)',
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_Tahun2025_6');
+        map.getPane('pane_Tahun2025_6').style.zIndex = 406;
+        map.getPane('pane_Tahun2025_6').style['mix-blend-mode'] = 'hard-light';
+        var layer_Tahun2025_6 = new L.geoJson(json_Tahun2025_6, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Tahun2025_6',
+            layerName: 'layer_Tahun2025_6',
+            pane: 'pane_Tahun2025_6',
+            onEachFeature: pop_Tahun2025_6,
+            style: style_Tahun2025_6_0,
+        });
+        bounds_group.addLayer(layer_Tahun2025_6);
+        function pop_Tahun2024_7(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">Desa_Kelurahan</th>\
+                        <td>' + (feature.properties['Desa_Kelurahan'] !== null ? autolinker.link(String(feature.properties['Desa_Kelurahan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kecamatan</th>\
+                        <td>' + (feature.properties['Kecamatan'] !== null ? autolinker.link(String(feature.properties['Kecamatan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Jenis Bantuan</th>\
+                        <td>' + (feature.properties['Tahun_2024 — Sheet1_Jenis_Bantuan'] !== null ? autolinker.link(String(feature.properties['Tahun_2024 — Sheet1_Jenis_Bantuan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.on('click', function(e) {
+                showInfoDesa(feature.properties);
+            });
+        }
+
+        function style_Tahun2024_7_0(feature) {
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2024'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2024'] <= 0.000000 ) {
+                return {
+                pane: 'pane_Tahun2024_7',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(255,255,255,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2024'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2024'] <= 1.000000 ) {
+                return {
+                pane: 'pane_Tahun2024_7',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(236,64,122,0.85)',
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_Tahun2024_7');
+        map.getPane('pane_Tahun2024_7').style.zIndex = 407;
+        map.getPane('pane_Tahun2024_7').style['mix-blend-mode'] = 'hard-light';
+        var layer_Tahun2024_7 = new L.geoJson(json_Tahun2024_7, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Tahun2024_7',
+            layerName: 'layer_Tahun2024_7',
+            pane: 'pane_Tahun2024_7',
+            onEachFeature: pop_Tahun2024_7,
+            style: style_Tahun2024_7_0,
+        });
+        bounds_group.addLayer(layer_Tahun2024_7);
+        function pop_Tahun2023_8(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">Desa_Kelurahan</th>\
+                        <td>' + (feature.properties['Desa_Kelurahan'] !== null ? autolinker.link(String(feature.properties['Desa_Kelurahan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kecamatan</th>\
+                        <td>' + (feature.properties['Kecamatan'] !== null ? autolinker.link(String(feature.properties['Kecamatan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Jenis_Bantuan</th>\
+                        <td>' + (feature.properties['Tahun_2023 — Sheet1_Jenis_Bantuan'] !== null ? autolinker.link(String(feature.properties['Tahun_2023 — Sheet1_Jenis_Bantuan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.on('click', function(e) {
+                showInfoDesa(feature.properties);
+            });
+        }
+
+        function style_Tahun2023_8_0(feature) {
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2023'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2023'] <= 0.000000 ) {
+                return {
+                pane: 'pane_Tahun2023_8',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(240,240,240,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2023'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_Tahun_2023'] <= 1.000000 ) {
+                return {
+                pane: 'pane_Tahun2023_8',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(186,104,200,0.85)',
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_Tahun2023_8');
+        map.getPane('pane_Tahun2023_8').style.zIndex = 408;
+        map.getPane('pane_Tahun2023_8').style['mix-blend-mode'] = 'hard-light';
+        var layer_Tahun2023_8 = new L.geoJson(json_Tahun2023_8, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Tahun2023_8',
+            layerName: 'layer_Tahun2023_8',
+            pane: 'pane_Tahun2023_8',
+            onEachFeature: pop_Tahun2023_8,
+            style: style_Tahun2023_8_0,
+        });
+        bounds_group.addLayer(layer_Tahun2023_8);
+        function pop_BSPS_9(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">Desa_Kelurahan</th>\
+                        <td>' + (feature.properties['Desa_Kelurahan'] !== null ? autolinker.link(String(feature.properties['Desa_Kelurahan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kecamatan</th>\
+                        <td>' + (feature.properties['Kecamatan'] !== null ? autolinker.link(String(feature.properties['Kecamatan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Tahun_Menerima</th>\
+                        <td>' + (feature.properties['Tahun_Menerima'] !== null ? autolinker.link(String(feature.properties['Tahun_Menerima']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.on('click', function(e) {
+                showInfoDesa(feature.properties);
+            });
+        }
+
+        function style_BSPS_9_0(feature) {
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_BSPS'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_BSPS'] <= 0.000000 ) {
+                return {
+                pane: 'pane_BSPS_9',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(240,240,240,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_BSPS'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_BSPS'] <= 1.000000 ) {
+                return {
+                pane: 'pane_BSPS_9',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(253,193,192,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_BSPS'] >= 1.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_BSPS'] <= 2.000000 ) {
+                return {
+                pane: 'pane_BSPS_9',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(255,0,3,0.85)',
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_BSPS_9');
+        map.getPane('pane_BSPS_9').style.zIndex = 409;
+        map.getPane('pane_BSPS_9').style['mix-blend-mode'] = 'hard-light';
+        var layer_BSPS_9 = new L.geoJson(json_BSPS_9, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_BSPS_9',
+            layerName: 'layer_BSPS_9',
+            pane: 'pane_BSPS_9',
+            onEachFeature: pop_BSPS_9,
+            style: style_BSPS_9_0,
+        });
+        bounds_group.addLayer(layer_BSPS_9);
+        function pop_APBDProvinsi_10(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">Desa_Kelurahan</th>\
+                        <td>' + (feature.properties['Desa_Kelurahan'] !== null ? autolinker.link(String(feature.properties['Desa_Kelurahan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kecamatan</th>\
+                        <td>' + (feature.properties['Kecamatan'] !== null ? autolinker.link(String(feature.properties['Kecamatan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Tahun_Menerima</th>\
+                        <td>' + (feature.properties['Tahun_Menerima'] !== null ? autolinker.link(String(feature.properties['Tahun_Menerima']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.on('click', function(e) {
+                showInfoDesa(feature.properties);
+            });
+        }
+
+        function style_APBDProvinsi_10_0(feature) {
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Provinsi'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Provinsi'] <= 0.000000 ) {
+                return {
+                pane: 'pane_APBDProvinsi_10',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(240,240,240,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Provinsi'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Provinsi'] <= 1.000000 ) {
+                return {
+                pane: 'pane_APBDProvinsi_10',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(194,232,255,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Provinsi'] >= 1.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Provinsi'] <= 2.000000 ) {
+                return {
+                pane: 'pane_APBDProvinsi_10',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(31,120,180,0.85)',
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_APBDProvinsi_10');
+        map.getPane('pane_APBDProvinsi_10').style.zIndex = 410;
+        map.getPane('pane_APBDProvinsi_10').style['mix-blend-mode'] = 'hard-light';
+        var layer_APBDProvinsi_10 = new L.geoJson(json_APBDProvinsi_10, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_APBDProvinsi_10',
+            layerName: 'layer_APBDProvinsi_10',
+            pane: 'pane_APBDProvinsi_10',
+            onEachFeature: pop_APBDProvinsi_10,
+            style: style_APBDProvinsi_10_0,
+        });
+        bounds_group.addLayer(layer_APBDProvinsi_10);
+        function pop_APBDKabupaten_11(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">Desa_Kelurahan</th>\
+                        <td>' + (feature.properties['Desa_Kelurahan'] !== null ? autolinker.link(String(feature.properties['Desa_Kelurahan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kecamatan</th>\
+                        <td>' + (feature.properties['Kecamatan'] !== null ? autolinker.link(String(feature.properties['Kecamatan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Tahun_Menerima</th>\
+                        <td>' + (feature.properties['Tahun_Menerima'] !== null ? autolinker.link(String(feature.properties['Tahun_Menerima']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.on('click', function(e) {
+                showInfoDesa(feature.properties);
+            });
+        }
+
+        function style_APBDKabupaten_11_0(feature) {
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Kabupaten'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Kabupaten'] <= 0.000000 ) {
+                return {
+                pane: 'pane_APBDKabupaten_11',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(240,240,240,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Kabupaten'] >= 0.000000 && feature.properties['q2wHide_Rekap_Jenis_dan_Tahun — Sheet1_APBD_Kabupaten'] <= 1.000000 ) {
+                return {
+                pane: 'pane_APBDKabupaten_11',
+                opacity: 1,
+                color: 'rgba(240,240,240,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(116,196,118,0.85)',
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_APBDKabupaten_11');
+        map.getPane('pane_APBDKabupaten_11').style.zIndex = 411;
+        map.getPane('pane_APBDKabupaten_11').style['mix-blend-mode'] = 'hard-light';
+        var layer_APBDKabupaten_11 = new L.geoJson(json_APBDKabupaten_11, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_APBDKabupaten_11',
+            layerName: 'layer_APBDKabupaten_11',
+            pane: 'pane_APBDKabupaten_11',
+            onEachFeature: pop_APBDKabupaten_11,
+            style: style_APBDKabupaten_11_0,
+        });
+        bounds_group.addLayer(layer_APBDKabupaten_11);
+        function pop_InformasiWilayah_12(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">Desa_Kelurahan</th>\
+                        <td>' + (feature.properties['Desa_Kelurahan'] !== null ? autolinker.link(String(feature.properties['Desa_Kelurahan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kode_Wilayah</th>\
+                        <td>' + (feature.properties['Kode_Wilayah'] !== null ? autolinker.link(String(feature.properties['Kode_Wilayah']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Kecamatan</th>\
+                        <td>' + (feature.properties['Kecamatan'] !== null ? autolinker.link(String(feature.properties['Kecamatan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Jumlah_Bantuan</th>\
+                        <td>' + (feature.properties['Jumlah_Bantuan'] !== null ? autolinker.link(String(feature.properties['Jumlah_Bantuan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Jenis_Bantuan</th>\
+                        <td>' + (feature.properties['Jenis_Bantuan'] !== null ? autolinker.link(String(feature.properties['Jenis_Bantuan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Tahun_bantuan</th>\
+                        <td>' + (feature.properties['Tahun_bantuan'] !== null ? autolinker.link(String(feature.properties['Tahun_bantuan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Jumlah_Penerima</th>\
+                        <td>' + (feature.properties['Jumlah_Penerima'] !== null ? autolinker.link(String(feature.properties['Jumlah_Penerima']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.on('click', function(e) {
+                showInfoDesa(feature.properties);
+            });
+        }
+
+        function style_InformasiWilayah_12_0(feature) {
+            if (feature.properties['Jumlah_Bantuan'] >= 0.000000 && feature.properties['Jumlah_Bantuan'] <= 0.000000 ) {
+                return {
+                pane: 'pane_InformasiWilayah_12',
+                opacity: 1,
+                color: 'rgba(158,158,158,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(240,240,240,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['Jumlah_Bantuan'] >= 0.000000 && feature.properties['Jumlah_Bantuan'] <= 1.000000 ) {
+                return {
+                pane: 'pane_InformasiWilayah_12',
+                opacity: 1,
+                color: 'rgba(158,158,158,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(255,213,79,0.85)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['Jumlah_Bantuan'] >= 1.000000 && feature.properties['Jumlah_Bantuan'] <= 2.000000 ) {
+                return {
+                pane: 'pane_InformasiWilayah_12',
+                opacity: 1,
+                color: 'rgba(158,158,158,0.85)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(251,140,0,0.85)',
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_InformasiWilayah_12');
+        map.getPane('pane_InformasiWilayah_12').style.zIndex = 412;
+        map.getPane('pane_InformasiWilayah_12').style['mix-blend-mode'] = 'hard-light';
+        var layer_InformasiWilayah_12 = new L.geoJson(json_InformasiWilayah_12, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_InformasiWilayah_12',
+            layerName: 'layer_InformasiWilayah_12',
+            pane: 'pane_InformasiWilayah_12',
+            onEachFeature: pop_InformasiWilayah_12,
+            style: style_InformasiWilayah_12_0,
+        });
+        bounds_group.addLayer(layer_InformasiWilayah_12);
+        map.addLayer(layer_InformasiWilayah_12);
+        function pop_BatasKecamatan_13(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">Kecamatan</th>\
+                        <td>' + (feature.properties['WADMKC'] !== null ? autolinker.link(String(feature.properties['WADMKC']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Total Nagori</th>\
+                        <td>' + (feature.properties['Rekap_Bantuan_Kecamatan — Sheet1_Total_Nagori'] !== null ? autolinker.link(String(feature.properties['Rekap_Bantuan_Kecamatan — Sheet1_Total_Nagori']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Jumlah Nagori Penerima</th>\
+                        <td>' + (feature.properties['Rekap_Bantuan_Kecamatan — Sheet1_Jumlah_Nagori_Penerima'] !== null ? autolinker.link(String(feature.properties['Rekap_Bantuan_Kecamatan — Sheet1_Jumlah_Nagori_Penerima']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">Jumlah Bantuan</th>\
+                        <td>' + (feature.properties['Rekap_Bantuan_Kecamatan — Sheet1_Jumlah Bantuan'] !== null ? autolinker.link(String(feature.properties['Rekap_Bantuan_Kecamatan — Sheet1_Jumlah Bantuan']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.on('click', function(e) {
+                showInfoDesa(feature.properties);
+            });
+        }
+
+        function style_BatasKecamatan_13_0() {
+            return {
+                pane: 'pane_BatasKecamatan_13',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: false,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_BatasKecamatan_13');
+        map.getPane('pane_BatasKecamatan_13').style.zIndex = 413;
+        map.getPane('pane_BatasKecamatan_13').style['mix-blend-mode'] = 'normal';
+        var layer_BatasKecamatan_13 = new L.geoJson(json_BatasKecamatan_13, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_BatasKecamatan_13',
+            layerName: 'layer_BatasKecamatan_13',
+            pane: 'pane_BatasKecamatan_13',
+            onEachFeature: pop_BatasKecamatan_13,
+            style: style_BatasKecamatan_13_0,
+        });
+        bounds_group.addLayer(layer_BatasKecamatan_13);
+        map.addLayer(layer_BatasKecamatan_13);
+        const url = {"Nominatim OSM": "https://nominatim.openstreetmap.org/search?format=geojson&addressdetails=1&",
+        "France BAN": "https://api-adresse.data.gouv.fr/search/?"}
+        var photonControl = L.control.photon({
+            url: url["Nominatim OSM"],
+            feedbackLabel: '',
+            position: 'topleft',
+            includePosition: true,
+            initial: true,
+            // resultsHandler: myHandler,
+        }).addTo(map);
+        photonControl._container.childNodes[0].style.borderRadius="10px"
+        // Create a variable to store the geoJSON data
+        var x = null;
+        // Create a variable to store the marker
+        var marker = null;
+        // Add an event listener to the Photon control to create a marker from the returned geoJSON data
+        var z = null;
+        photonControl.on('selected', function(e) {
+            console.log(photonControl.search.resultsContainer);
+            if (x != null) {
+                map.removeLayer(obj3.marker);
+                map.removeLayer(x);
+            }
+            obj2.gcd = e.choice;
+            x = L.geoJSON(obj2.gcd).addTo(map);
+            var label = typeof obj2.gcd.properties.label === 'undefined' ? obj2.gcd.properties.display_name : obj2.gcd.properties.label;
+            obj3.marker = L.marker(x.getLayers()[0].getLatLng()).bindPopup(label).addTo(map);
+            map.setView(x.getLayers()[0].getLatLng(), 17);
+            z = typeof e.choice.properties.label === 'undefined'? e.choice.properties.display_name : e.choice.properties.label;
+            console.log(e);
+            e.target.input.value = z;
+        });
+        var search = document.getElementsByClassName("leaflet-photon leaflet-control")[0];
+        search.classList.add("leaflet-control-search")
+        search.style.display = "flex";
+        search.style.backgroundColor="rgba(255,255,255,0.5)" 
+
+        // Create the new button element
+        var button = document.createElement("div");
+        button.id = "gcd-button-control";
+        button.className = "gcd-gl-btn fa fa-search search-button";
+
+        // Insert the button at the beginning of the search control
+        search.insertBefore(button, search.firstChild);
+        last = search.lastChild;
+        last.style.display = "none";
+        button.addEventListener("click", function (e) {
+            if (last.style.display === "none") {
+                last.style.display = "block";
+            } else {
+                last.style.display = "none";
+            }
+        });
+        var overlaysTree = [
+            {label: '<img src="legend/BatasKecamatan_13.png" /> Batas Kecamatan', layer: layer_BatasKecamatan_13},
+            {label: "ESRI Satellite", layer: layer_ESRISatellite_4},
+            {label: "ESRI Topo", layer: layer_ESRITopo_3},
+            {label: "OSM Standard", layer: layer_OSMStandard_2},
+            {label: "Google Satellite", layer: layer_GoogleSatellite_1},
+            {label: "Google Road", layer: layer_GoogleRoad_0},]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: true,
+        });
+        lay.addTo(map);
+        map.on("zoomend", function(){
+
+                if (map.hasLayer(layer_BatasKecamatan_13)) {
+                    if (map.getZoom() <= 19 && map.getZoom() >= 19) {
+                        layer_BatasKecamatan_13.eachLayer(function (layer) {
+                            layer.openTooltip();
+                        });
+                    } else {
+                        layer_BatasKecamatan_13.eachLayer(function (layer) {
+                            layer.closeTooltip();
+                        });
+                    }
+                }
+        });
+        setBounds();
+        var i = 0;
+        layer_BatasKecamatan_13.eachLayer(function(layer) {
+            var context = {
+                feature: layer.feature,
+                variables: {}
+            };
+            layer.bindTooltip((layer.feature.properties['WADMKC'] !== null?String('<div style="color: #000000; font-size: 10pt; font-style: italic; font-family: \'Cambria\', sans-serif;">' + layer.feature.properties['WADMKC']) + '</div>':''), {permanent: true, offset: [-0, -16], className: 'css_BatasKecamatan_13'});
+            labels.push(layer);
+            totalMarkers += 1;
+              layer.added = true;
+              addLabel(layer, i);
+              i++;
+        });
+                if (map.hasLayer(layer_BatasKecamatan_13)) {
+                    if (map.getZoom() <= 19 && map.getZoom() >= 19) {
+                        layer_BatasKecamatan_13.eachLayer(function (layer) {
+                            layer.openTooltip();
+                        });
+                    } else {
+                        layer_BatasKecamatan_13.eachLayer(function (layer) {
+                            layer.closeTooltip();
+                        });
+                    }
+                }
+        map.addControl(new L.Control.Search({
+            layer: layer_InformasiWilayah_12,
+            initial: false,
+            hideMarkerOnCollapse: true,
+            propertyName: 'Desa_Kelurahan'}));
+        if (typeof url === 'undefined') {
+            document.getElementsByClassName('search-button')[0].className += ' fa fa-binoculars';
+        } else {
+            document.getElementsByClassName('search-button')[1].className += ' fa fa-binoculars';
+        }
+        resetLabels([layer_BatasKecamatan_13]);
+        map.on("zoomend", function(){
+            resetLabels([layer_BatasKecamatan_13]);
+        });
+        map.on("layeradd", function(){
+            resetLabels([layer_BatasKecamatan_13]);
+        });
+        map.on("layerremove", function(){
+            resetLabels([layer_BatasKecamatan_13]);
+        });
+        setTimeout(function(){map.invalidateSize();},800);
+</script>
+<script src="js/dashboard.js"></script>
+    
+
+<script src="js/data_dashboard_asli.js"></script>
+<script src="js/chart_data_asli.js"></script>
+<script src="js/interactive_stat.js"></script>
+<script src="js/interactive_dashboard.js"></script>
+<script src="js/stat_fix.js"></script>
+<script src="js/hierarchical_info.js"></script>
+<script src="js/panel_toggle.js"></script>
+<script src="js/fullscreen_control.js"></script>
+<script src="js/dashboard_filter.js"></script>
+<script src="js/mobile_responsive.js"></script>
+</body>
+</html>
